@@ -1,0 +1,61 @@
+{
+  "name": "training-hub",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && tsc -p tsconfig.server.json && node scripts/build-ai-bridge.mjs && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc -p tsconfig.app.json && tsc -p tsconfig.server.json",
+    "typecheck:server": "tsc -p tsconfig.server.json",
+    "lint": "eslint . --max-warnings 0",
+    "test": "node --import ./tests/offline-register.mjs --test tests/*.test.ts tests/*.test.mjs",
+    "test:ai-bridge": "node --import ./tests/offline-register.mjs --test tests/ai-bridge.test.ts",
+    "test:performance": "node --import ./tests/offline-register.mjs tests/performance.test.ts",
+    "test:execution": "node --import ./tests/offline-register.mjs tests/execution.test.ts",
+    "test:measurement": "node --import ./tests/offline-register.mjs --test tests/measurement.test.mjs",
+    "test:warmup": "node --import ./tests/offline-register.mjs --test tests/warmup.test.mjs",
+    "test:recovery": "node --import ./tests/offline-register.mjs --test tests/recovery-plan.test.mjs",
+    "validate:cloud-foundation": "node scripts/validate-cloud-foundation.mjs",
+    "validate:library": "node --import ./tests/offline-register.mjs scripts/validate-library-v1.ts",
+    "validate:library-expansion": "node --import ./tests/offline-register.mjs tests/library-expansion.test.ts",
+    "validate:program": "node --import ./tests/offline-register.mjs scripts/validate-program-v01.ts",
+    "validate:schema": "node --import ./tests/offline-register.mjs scripts/validate-v03.ts",
+    "audit:library": "node --import ./tests/offline-register.mjs scripts/audit-library-coverage.ts",
+    "test:flexible-training": "node --import ./tests/offline-register.mjs --test tests/flexible-training.test.ts",
+    "test:plan-import": "node --import ./tests/offline-register.mjs --test tests/plan-import.test.ts",
+    "test:training-review": "node --import ./tests/offline-register.mjs --test tests/training-review.test.ts",
+    "test:plan-v2": "node --import ./tests/offline-register.mjs --test tests/plan-v2.test.ts",
+    "test:library-v22": "node --import ./tests/offline-register.mjs --test tests/library-v22.test.ts",
+    "test:replacement-repositories": "node --import ./tests/offline-register.mjs --test tests/replacement-repositories.test.ts",
+    "validate:flexible-training-mobile": "node tests/flexible-training-mobile-check.mjs",
+    "validate:library-v22-mobile": "node tests/library-v22-mobile-check.mjs",
+    "validate:plan-import-mobile": "node tests/plan-import-mobile-check.mjs",
+    "validate:library-mobile": "node tests/library-mobile-check.mjs"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "1.30.0",
+    "@supabase/supabase-js": "^2.57.4",
+    "@vitejs/plugin-react": "^5.0.4",
+    "react": "^19.1.1",
+    "react-dom": "^19.1.1",
+    "typescript": "^5.9.2",
+    "vite": "^7.1.7",
+    "zod": "3.25.76"
+  },
+  "devDependencies": {
+    "@types/node": "24.3.1",
+    "@types/react": "^19.1.16",
+    "@types/react-dom": "^19.1.9",
+    "@typescript-eslint/parser": "8.72.1",
+    "esbuild": "0.25.12",
+    "eslint": "10.13.0",
+    "tsx": "4.20.6"
+  },
+  "engines": {
+    "node": "24.x || 26.x",
+    "npm": ">=10"
+  },
+  "license": "MIT"
+}

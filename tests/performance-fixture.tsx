@@ -1,0 +1,21 @@
+// Local synthetic evidence only. No Auth/cloud reads or writes.
+import React from 'react';
+import {createRoot} from 'react-dom/client';
+import {PerformanceProfileView} from '../src/PerformanceProfile';
+import type {PerformanceEvidence} from '../src/performance-profile';
+import type {WorkoutSet} from '../src/domain/training';
+import type {LoadTrackingType} from '../src/schema.v03';
+import '../src/styles.css';
+import {ExercisesPage} from '../src/CloudTrainingApp';
+const mode=new URLSearchParams(location.search).get('mode')??'strength';
+const now=new Date('2026-09-18T12:00:00Z');
+const count=mode==='empty'?0:mode==='one'?1:mode==='many'?60:5;
+const set=(id:string,patch:Partial<WorkoutSet>):WorkoutSet=>({id,userId:'fixture',workoutExerciseId:'fixture',order:0,completed:true,version:1,updatedAt:'fixture',...patch});
+const evidence:PerformanceEvidence[]=Array.from({length:count},(_,i)=>{const completedAt=new Date(now.getTime()-(count-i)*86400000*2).toISOString();const id=`run-${i}`;let sets=[set(id,{actualLoad:80+i,actualReps:5}),set(id+'-2',{order:1,actualLoad:80+i,actualReps:5}),set(id+'-3',{order:2,actualLoad:75+i,actualReps:6})];
+if(mode==='reps')sets=[set(id,{actualLoad:0,actualReps:8+i}),set(id+'weighted',{actualLoad:10,actualReps:5+i})];
+if(mode==='duration')sets=[set(id,{actualDurationSeconds:20+i*5,measurementSnapshot:{version:1,types:['duration'],trackLoad:false,side:'eachSide'}})];
+if(mode==='breaths')sets=[set(id,{actualBreaths:5,measurementSnapshot:{version:1,types:['breaths'],trackLoad:false}})];
+if(mode==='multi')sets=[set(id,{actualReps:10+i,measurementSnapshot:{version:1,types:['reps'],trackLoad:false}}),set(id+'sec',{actualDurationSeconds:20+i,measurementSnapshot:{version:1,types:['duration'],trackLoad:false,side:'eachSide'}})];
+return {runId:id,completedAt,sessionName:'恢复训练 · 髋主导',variationId:'fixture',preparation:false,sets};});
+const loadType:LoadTrackingType=mode==='reps'?'bodyweight':'externalLoad';
+createRoot(document.getElementById('root')!).render(<div className="v1"><main className="v1-main">{mode==='entry'?<ExercisesPage onSession={id=>document.body.dataset.session=id}/>:<PerformanceProfileView evidence={evidence} nameZh="短杠杆哥本哈根支撑与单侧控制" nameEn="Exercise Performance · local fixture" loadType={loadType} now={now} onBack={()=>document.body.dataset.back='true'} onSession={id=>document.body.dataset.session=id}/>}</main><nav className="mobile-nav">{['Today','Plan','Exercises','History','Profile'].map(x=><button key={x}>{x}</button>)}</nav></div>);

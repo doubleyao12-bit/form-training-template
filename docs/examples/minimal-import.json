@@ -1,0 +1,65 @@
+{
+  "version": "form.plan-import.v1",
+  "plan": {
+    "name": "Synthetic import demonstration",
+    "expectedSessionsPerWeek": 4,
+    "sessions": [
+      {
+        "order": 0,
+        "title": "Synthetic 1",
+        "warmupProfile": "A",
+        "exercises": [
+          {
+            "order": 0,
+            "exercise": "goblet-squat--legacy-default",
+            "measurement": "reps",
+            "sets": 2,
+            "reps": 8
+          }
+        ]
+      },
+      {
+        "order": 1,
+        "title": "Synthetic 2",
+        "warmupProfile": "B",
+        "exercises": [
+          {
+            "order": 0,
+            "exercise": "goblet-squat--legacy-default",
+            "measurement": "reps",
+            "sets": 2,
+            "reps": 8
+          }
+        ]
+      },
+      {
+        "order": 2,
+        "title": "Synthetic 3",
+        "warmupProfile": "C",
+        "exercises": [
+          {
+            "order": 0,
+            "exercise": "goblet-squat--legacy-default",
+            "measurement": "reps",
+            "sets": 2,
+            "reps": 8
+          }
+        ]
+      },
+      {
+        "order": 3,
+        "title": "Synthetic 4",
+        "warmupProfile": "D",
+        "exercises": [
+          {
+            "order": 0,
+            "exercise": "goblet-squat--legacy-default",
+            "measurement": "reps",
+            "sets": 2,
+            "reps": 8
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "id": "/",
+  "name": "FORM",
+  "short_name": "FORM",
+  "description": "Personal training plans and records",
+  "lang": "zh-CN",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#090a0a",
+  "theme_color": "#090a0a",
+  "icons": []
+}

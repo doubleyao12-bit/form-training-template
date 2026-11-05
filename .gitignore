@@ -1,0 +1,12 @@
+node_modules/
+dist/
+api/mcp.js
+api/mcp.js.map
+.validation/
+*.tsbuildinfo
+.env*
+!.env.example
+supabase/.temp/
+.vercel/
+playwright-report/
+test-results/

@@ -1,0 +1,12 @@
+export type Status="draft"|"active"|"completed"|"archived";
+export interface TrainingGoal{goalId:string;name:string;startDate:string;targetDate:string;primaryGoal:string;secondaryGoals:string[];targetMetrics:string[];weeklyTrainingFrequency:number;notes:string;status:Status}
+export interface TrainingCycle{cycleId:string;goalId:string;name:string;startDate:string;endDate:string;focus:string;targetMetrics:string[];notes:string;status:Status}
+export interface PlannedSet{setId:string;targetReps:number;targetLoad:number;targetRPE?:number;targetRIR?:number;restSeconds:number;tempo?:string;actualLoad?:number;actualReps?:number;actualRPE?:number;actualRIR?:number;completed:boolean;note:string}
+export interface SessionExercise{itemId:string;exerciseId:string;variationId:string;order:number;sets:PlannedSet[];notes:string;status:"planned"|"completed"|"skipped"}
+export interface WorkoutSession{sessionId:string;name:string;purpose:string;exercises:SessionExercise[];notes:string;status:"planned"|"inProgress"|"completed"|"skipped";startedAt?:string;completedAt?:string}
+export interface WeeklyPlan{weeklyPlanId:string;cycleId:string;weekNumber:number;sessionIds:string[];plannedTrainingVolume:number;notes:string;status:Status}
+export interface PainRecord{bodyArea:string;severity:number;note:string}
+export interface TrainingFeedback{feedbackId:string;sessionId:string;sessionCompletion:number;overallRPE:number;energyLevel:number;performanceFeeling:string;painOrDiscomfort:boolean;pain?:PainRecord;notes:string;createdAt:string}
+export interface ExternalActivity{activityId:string;type:"Football"|"Tennis"|"Running"|"Other";date:string;duration:number;intensity:number;perceivedFatigue:number;notes:string}
+export interface PersonalExerciseProfile{exerciseId:string;familiarity:"new"|"learning"|"familiar";currentWorkingLoad?:number;bestRecentPerformance:string;comfortLevel:number;painHistory:string;personalNotes:string;enabledForProgramming:boolean;lastPerformedAt?:string;recentPerformance:string}
+export interface HubState{goals:TrainingGoal[];cycles:TrainingCycle[];weeklyPlans:WeeklyPlan[];sessions:WorkoutSession[];feedback:TrainingFeedback[];activities:ExternalActivity[];profiles:PersonalExerciseProfile[]}

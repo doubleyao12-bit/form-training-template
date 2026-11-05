@@ -1,0 +1,26 @@
+{
+  "ownerConfirmed": true,
+  "firstPartyLicense": "MIT",
+  "publicationApproved": false,
+  "exclude": [
+    "internal/**",
+    ".git/**",
+    "node_modules/**",
+    "dist/**",
+    ".env",
+    ".env.local",
+    ".validation/**",
+    "api/mcp.js",
+    "api/mcp.js.map",
+    "**/*.tsbuildinfo"
+  ],
+  "tutorials": {
+    "admitted": 110,
+    "unreviewed": 115
+  },
+  "remainingReview": [
+    "expressive text provenance and site policies",
+    "dependency version/artifact notices",
+    "full local Supabase integration"
+  ]
+}

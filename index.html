@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#090a0a" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black" />
+    <meta name="apple-mobile-web-app-title" content="FORM" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <title>FORM</title>
+  </head>
+  <body style="margin:0;background:#090a0a;color:#f5f5f3">
+    <div id="root"></div>
+    <section id="boot-recovery" role="status" style="position:fixed;inset:0;z-index:9999;display:grid;align-content:center;padding:32px;background:#090a0a;font:16px/1.6 system-ui,sans-serif">
+      <div style="max-width:420px;width:100%;margin:auto">
+        <strong style="font-size:24px">FORM</strong>
+        <p id="boot-message">正在打开训练…</p>
+        <button id="boot-retry" hidden style="font:inherit;border:0;border-radius:12px;padding:14px 24px;background:#d5ff45;color:#090a0a">重新加载</button>
+        <noscript>请启用 JavaScript 后重新打开 FORM。</noscript>
+      </div>
+    </section>
+    <script>
+      (() => {
+        const panel = document.getElementById('boot-recovery');
+        const message = document.getElementById('boot-message');
+        const retry = document.getElementById('boot-retry');
+        let finished = false;
+        const fail = () => {
+          if (finished) return;
+          message.textContent = '启动未完成。请检查网络后重新加载；训练记录不会被清除。';
+          retry.hidden = false;
+        };
+        const timer = setTimeout(fail, 12000);
+        window.addEventListener('error', fail, true);
+        window.addEventListener('unhandledrejection', fail);
+        window.addEventListener('form:boot-ready', () => {
+          finished = true;
+          clearTimeout(timer);
+          window.removeEventListener('error', fail, true);
+          window.removeEventListener('unhandledrejection', fail);
+          panel.remove();
+        }, { once: true });
+        retry.addEventListener('click', () => {
+          const url = new URL(window.location.href);
+          url.searchParams.set('_form_reload', String(Date.now()));
+          window.location.replace(url.href);
+        });
+      })();
+    </script>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
