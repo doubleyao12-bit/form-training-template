@@ -22,6 +22,7 @@ export interface WorkoutRepository {
   removeExercise(exerciseId:string,scope?:import('../domain/training').WorkoutChangeScope):Promise<WorkoutRunAggregate>;
   startRun(runId: string): Promise<void>;
   reorderExercises(runId: string, ids: string[], expectedVersion: number): Promise<WorkoutRunAggregate>;
+  getSet(setId: string): Promise<WorkoutSet>;
   updateSet(setId: string, patch: WorkoutSetPatch): Promise<WorkoutSet>;
   addSet(workoutExerciseId: string, id?: string): Promise<WorkoutSet>;
   deleteSet(setId: string): Promise<void>;

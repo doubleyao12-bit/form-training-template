@@ -58,3 +58,9 @@ Source exports exclude private environment files, internal research, dependencie
 For users who want their own training workflow, Codex/Cursor can help inspect and customize FORM. Ask the agent to read [AGENTS.md](AGENTS.md) and [AI_START_HERE](docs/AI_START_HERE.md) first, then choose a [recipe](docs/CUSTOMIZATION_RECIPES.md) through the [capability map](docs/CUSTOMIZATION_MAP.md). See [Quickstart](docs/QUICKSTART.md) for verification boundaries.
 
 先让 AI 理解需求并提出已有能力、最小方案、限制和测试，经你确认后再生成导入 JSON 或修改代码；实际导入、覆盖或保存仍需确认。优先使用计划导入和编辑，不将未来开发冒充内置配置。使用独立数据库，避免影响已有真实数据；数据库、安装和部署操作需单独授权。最小真实云端验收 6/6 通过；完整本地 Supabase 栈尚未验收，不是一键部署。
+
+## Save recovery and search
+
+Workout inputs use a durable per-set browser draft and version-checked saves. Retry reconciles ambiguous responses; conflicting values require your confirmation instead of silently overwriting cloud data. Legacy drafts remain readable and may require manual review. See [save recovery and local privacy](docs/QUICKSTART.md#save-recovery-and-local-privacy).
+
+Search supports normalized case/width/punctuation, multiple terms, equipment aliases and exact exercise/execution IDs. Existing category, warm-up and replacement restrictions still apply; this is not a global equipment whitelist.

@@ -97,6 +97,13 @@ export class SupabaseWorkoutRepository implements WorkoutRepository {
     return updated;
   }
 
+  async getSet(setId: string) {
+    const userId = await requireUserId(this.client);
+    const {data,error}=await this.client.from('workout_sets').select('*').eq('user_id',userId).eq('id',setId).abortSignal(AbortSignal.timeout(15000)).single();
+    if(error)throw error;
+    return mapSet(data as Row);
+  }
+
   async updateSet(setId: string, patch: WorkoutSetPatch) {
     const userId = await requireUserId(this.client);
     const { version, ...values } = patch;
@@ -114,7 +121,7 @@ export class SupabaseWorkoutRepository implements WorkoutRepository {
       actual_duration_seconds: values.actualDurationSeconds, actual_breaths: values.actualBreaths,
       ...(values.measurementSnapshot?{measurement_snapshot:values.measurementSnapshot}:{}),
       completed: values.completed, note: values.note, version: version + 1,
-    }).eq("user_id", userId).eq("id", setId).eq("version", version).select("*").maybeSingle();
+    }).eq("user_id", userId).eq("id", setId).eq("version", version).select("*").abortSignal(AbortSignal.timeout(15000)).maybeSingle();
     if (error) throw error;
     if (!data) throw new Error("Workout set changed elsewhere. Reload before retrying.");
     return mapSet(data as Row);

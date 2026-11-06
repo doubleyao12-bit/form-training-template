@@ -97,3 +97,9 @@ All changes preserve IDs, signatures, measurement, snapshots, RLS and released m
 - Entry: [src/data/supabase/client.ts](../src/data/supabase/client.ts), `getSupabaseClient`.
 - Constraints, user decision and missing verification: Minimum real-cloud Auth/REST/browser paths passed; deployment and full local stack remain unverified; confirm target, account access, cost and isolation.
 - Checks: typecheck, build, plus full offline regression.
+
+## Search and save-recovery boundaries
+
+- Search: `src/exercise-search.ts` supplies normalized multi-term matching through `src/catalog-search.ts`; `ReplacementSheet` keeps its existing warm-up, selected-action and replacement constraints. IDs remain stable and searchable. This does not enforce an equipment whitelist.
+- Saves: `src/workout-save-queue.ts`, `src/pending-journal.ts` and `WorkoutScreen` reconcile per-set drafts via the existing version-checked repository. Preserve explicit conflict confirmation, current-user/active-workout checks, and historical values. `src/conflict-backups.ts` stores and explicitly clears current-user local backups; never delete pending drafts as a repair strategy.
+- Run save queue, adapter, backup and search regressions plus browser recovery checks when changing these boundaries. Simulated browser transports do not verify cloud RLS.

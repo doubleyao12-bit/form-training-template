@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import type { ReplacementReason, WorkoutExercise, WorkoutRunAggregate, WorkoutSet, WorkoutSetPatch } from "./domain/training";
 import { canFinishWorkout, nextPendingExercise } from "./core-loop";
 import { getTrainingRepositories } from "./data/supabase/repositories";
-import { journalWorkoutWrite, readPendingWorkoutWrites, removeWorkoutWrite, shouldReplayWorkoutWrite } from "./pending-journal";
+import { journalWorkoutWrite, readPendingWorkoutWrites, removeWorkoutWrite } from "./pending-journal";
 import { rankSubstitutions } from "./substitution";
 import { getVariationDisplay, getVariationMetadata, withCurrentExerciseDisplays } from "./exercise-display";
 import { formatPerformance, loadInputCopy } from "./load-tracking";
@@ -12,13 +12,15 @@ import {ExerciseOrder} from './ExerciseOrder';
 import {modeLabels,selectMeasurement} from './measurement-modes';
 import {AddWorkoutAction,RemoveWorkoutAction} from './WorkoutActions';
 
+import { WorkoutSaveQueue, SetWriteConflict, setPatch } from './workout-save-queue';
+import {archiveConflict, clearConflictBackups, conflictBackupCount} from './conflict-backups';
 import { aggregateSaveState, type SaveState } from "./save-state";
 type SetValues = Omit<WorkoutSetPatch, "version">;
 const repos = () => getTrainingRepositories();
 
 export default function WorkoutScreen({ run: initialRun, onExit }: { run: WorkoutRunAggregate; onExit: () => Promise<void> }) {
   const [run, setRun] = useState(()=>withCurrentExerciseDisplays(initialRun));
-  const [saveState, setSaveState] = useState<SaveState>("Saved");
+  const [saveState, setSaveState] = useState<SaveState>("Saving");
   const [error, setError] = useState("");
   const [replaying, setReplaying] = useState(false);
   const [replacing, setReplacing] = useState<WorkoutExercise | null>(null);
@@ -32,28 +34,60 @@ export default function WorkoutScreen({ run: initialRun, onExit }: { run: Workou
   const failedSets = useRef(new Set<string>());
   const operationRetry = useRef<(() => Promise<void>) | null>(null);
   const initialReplayStarted = useRef(false);
+  const replayBusy = useRef(false);
+  const memoryOnly = useRef(new Map<string,WorkoutSet>());
+  const queueRef = useRef<WorkoutSaveQueue | null>(null);
+  if (!queueRef.current) queueRef.current = new WorkoutSaveQueue({
+    read: readPendingWorkoutWrites, put: journalWorkoutWrite, remove: removeWorkoutWrite,
+    get: async id => {
+      const value=await repos().workouts.getSet(id);
+      if(!runRef.current.exercises.some(exercise=>exercise.id===value.workoutExerciseId))throw new Error('待保存组不属于当前训练，内容已保留，禁止自动写入。');
+      return value;
+    }, update: (id,patch) => repos().workouts.updateSet(id,patch),
+    accepted: (id,saved) => replaceRun(mapSet(runRef.current,id,()=>saved)), changed: () => syncSaveState(),
+  }, initialRun.id, initialRun.userId);
+  const queue = queueRef.current;
+  inFlight.current = queue.running;
   function syncSaveState() {
-    const pending = readPendingWorkoutWrites().some(item => item.workoutRunId === runRef.current.id);
-    setSaveState(aggregateSaveState(inFlight.current.size + timers.current.size + Number(pending), failedSets.current.size, Boolean(operationRetry.current) || saveFailed.current));
+    failedSets.current = new Set(queueRef.current?.failures.keys());
+    try {
+      const pending = queueRef.current?.entries().length ?? 0;
+      setSaveState(aggregateSaveState(inFlight.current.size + timers.current.size + Number(pending), failedSets.current.size, Boolean(operationRetry.current) || saveFailed.current));
+    } catch (cause) {saveFailed.current=true;setSaveState('Retry');setError(messageOf(cause));}
   }
 
-  const replaceRun = (next: WorkoutRunAggregate) => { const displayed=withCurrentExerciseDisplays(next);runRef.current = displayed; setRun(displayed); };
+  const replaceRun = (next: WorkoutRunAggregate) => {
+    let displayed=withCurrentExerciseDisplays(next);
+    // A remote reload must never erase durable local input before reconciliation.
+    for (const entry of queue.entries()) displayed=mapSet(displayed,entry.setId,set=>({...set,...localValues(entry.patch)}));
+    runRef.current = displayed; setRun(displayed);
+  };
   const reload = async () => { const next = await repos().workouts.getActiveRun(); if (next) replaceRun(next); return next; };
 
   useEffect(() => {
     if (!initialReplayStarted.current) {
       initialReplayStarted.current = true;
-      void replayJournal();
+      try { replaceRun(runRef.current); void replayJournal(); }
+      catch (cause) { saveFailed.current=true;setError(messageOf(cause));setSaveState('Retry'); }
     }
     return () => { for (const timer of timers.current.values()) window.clearTimeout(timer); };
   }, []);
 
   function updateLocalSet(setId: string, values: SetValues) {
+    const before = findSet(runRef.current, setId);
+    if (!before) return false;
     const next = mapSet(runRef.current, setId, set => ({ ...set, ...localValues(values) }));
-    replaceRun(next);
     const set = findSet(next, setId);
-    if (!set) return;
-    journalWorkoutWrite({ workoutRunId: next.id, setId, patch: toPatch(set), timestamp: new Date().toISOString() });
+    if (!set) return false;
+    // Durable write succeeds before replacing the visible input state.
+    try { queue.edit(memoryOnly.current.get(setId) ?? before, setPatch(set)); memoryOnly.current.delete(setId); }
+    catch (cause) {
+      runRef.current=next;setRun(next);saveFailed.current=true;setSaveState('Retry');
+      if(!memoryOnly.current.has(setId))memoryOnly.current.set(setId,before);
+      setError(`本机草稿无法持久保存，请勿关闭页面：${messageOf(cause)}`);return false;
+    }
+    replaceRun(next);
+    return true;
   }
 
   function queueSet(setId: string, values: SetValues, immediate = false) {
@@ -64,7 +98,7 @@ export default function WorkoutScreen({ run: initialRun, onExit }: { run: Workou
       if(!m.types.includes('duration'))delete values.actualDurationSeconds;
       if(!m.types.includes('breaths'))delete values.actualBreaths;
     }
-    updateLocalSet(setId, values);
+    if(!updateLocalSet(setId, values))return;
     const priorTimer = timers.current.get(setId);
     if (priorTimer) window.clearTimeout(priorTimer);
     timers.current.set(setId, window.setTimeout(() => { timers.current.delete(setId); void persistLatest(setId); }, immediate ? 0 : 420));
@@ -72,62 +106,31 @@ export default function WorkoutScreen({ run: initialRun, onExit }: { run: Workou
   }
 
   async function persistLatest(setId: string) {
-    const prior = inFlight.current.get(setId) ?? Promise.resolve();
-    const task = prior.catch(() => undefined).then(async () => {
-      const current = findSet(runRef.current, setId);
-      if (!current) return;
-      const sent = toPatch(current);
-      const saved = await repos().workouts.updateSet(setId, sent);
-      const latest = findSet(runRef.current, setId);
-      if (!latest) return;
-      replaceRun(mapSet(runRef.current, setId, set => ({ ...set, version: saved.version, updatedAt: saved.updatedAt })));
-      const stillLatest = findSet(runRef.current, setId);
-      if (!timers.current.has(setId) && stillLatest && sameValues(stillLatest, sent)) removeWorkoutWrite(setId);
-    });
-    inFlight.current.set(setId, task);
-    try {
-      await task;
-      failedSets.current.delete(setId);
-      saveFailed.current = failedSets.current.size > 0;
-      if (inFlight.current.get(setId) === task) inFlight.current.delete(setId);
-      syncSaveState();
-    } catch (cause) {
-      if (inFlight.current.get(setId) === task) inFlight.current.delete(setId);
-      failedSets.current.add(setId); saveFailed.current = true; syncSaveState(); setError(messageOf(cause));
-    }
+    try { await queue.drain(setId); saveFailed.current = false; }
+    catch (cause) { setError(messageOf(cause)); }
+    finally { syncSaveState(); }
   }
 
   async function flush() {
+    for(const [id,base] of memoryOnly.current) {
+      const local=findSet(runRef.current,id);
+      if(!local)throw new Error('本机内存草稿待核对，请勿关闭页面。');
+      queue.edit(base,setPatch(local));memoryOnly.current.delete(id);
+    }
+    for (const timer of timers.current.values()) window.clearTimeout(timer);
+    timers.current.clear();
+    await queue.flush();
     saveFailed.current = false;
-    const scheduled = [...timers.current];
-    for (const [setId, timer] of scheduled) { window.clearTimeout(timer); timers.current.delete(setId); }
-    await Promise.all(scheduled.map(([setId]) => persistLatest(setId)));
-    await Promise.allSettled([...inFlight.current.values()]);
-    if (saveFailed.current || readPendingWorkoutWrites().some(item => item.workoutRunId === run.id)) throw new Error("仍有训练数据尚未保存，请重试。");
+    syncSaveState();
   }
 
   async function replayJournal() {
-    if (replaying) return;
-    const pending = readPendingWorkoutWrites().filter(item => item.workoutRunId === initialRun.id);
-    if (!pending.length) return;
-    setReplaying(true);
-    setSaveState("Saving"); setError(""); saveFailed.current = false;
-    try {
-      const cloud = await reload();
-      if (!cloud) throw new Error("找不到正在进行的训练。");
-      for (const entry of pending) {
-        const set = findSet(cloud, entry.setId);
-        if (!set) throw new Error("这组记录已不存在，待保存内容仍保留。请核对训练记录。");
-        if (!shouldReplayWorkoutWrite(set.updatedAt, entry.timestamp)) throw new Error("这组数据在另一端已更新。待保存内容仍保留，请先核对云端记录。");
-        const saved = await repos().workouts.updateSet(entry.setId, { ...entry.patch, version: set.version });
-        replaceRun(mapSet(runRef.current, entry.setId, value => ({ ...value, ...localValues(entry.patch), version: saved.version, updatedAt: saved.updatedAt })));
-        removeWorkoutWrite(entry.setId);
-      }
-      failedSets.current.clear(); syncSaveState();
-    } catch (cause) { saveFailed.current = true; setSaveState("Retry"); setError(messageOf(cause)); }
-    finally { setReplaying(false); }
+    if (replayBusy.current) return;
+    replayBusy.current = true; setReplaying(true); setError("");
+    try { await flush(); }
+    catch (cause) { setError(messageOf(cause)); }
+    finally { replayBusy.current = false; setReplaying(false); syncSaveState(); }
   }
-
   const current = nextPendingExercise(run);
   const completed = run.exercises.filter(item => item.status === "completed").length;
 
@@ -146,11 +149,20 @@ export default function WorkoutScreen({ run: initialRun, onExit }: { run: Workou
     if (readPendingWorkoutWrites().some(item => item.workoutRunId === runRef.current.id)) return;
     if (operation) { operationRetry.current = null; saveFailed.current = false; await operation(); }
   }
+  async function resolveConflict(id: string, choice: 'local' | 'remote') {
+    if (!window.confirm(choice==='local' ? '确认使用下面的本机草稿？将以刚核对的云端版本保存；原冲突内容会留存本机备份。' : '确认采用下面的云端数据？本机原草稿会另存备份，不会直接删除。')) return;
+    try {
+      await queue.resolve(id,choice,(entry,remote)=>{
+        archiveConflict(initialRun.userId,entry,remote,choice);
+      });setError('');saveFailed.current=false;
+    } catch(cause) { setError(messageOf(cause)); }
+    syncSaveState();
+  }
 
   return <div className="workout execution">
     <header><button onClick={pauseWorkout}>← 暂停</button><div><small>{saveState}</small><h2>{run.sessionSnapshot.name}</h2></div><button className="primary" disabled={!canFinishWorkout(run)||saveState!=="Saved"} onClick={()=>setConfirmFinish(true)}>完成训练</button></header>
     <div className={`workout-save-strip ${saveState==="Retry"?"failed":""}`} role="status"><span>{saveState==="Retry"?`Save failed · ${failedSets.current.size||1} 项需要重试`:saveState==="Saving"?"Saving…":"Saved"}</span>{saveState==="Retry"&&<button onClick={()=>void retryWrites()}>Retry</button>}{saveState==="Retry"&&error&&<small>{error}</small>}</div>
-    <main><div className="workout-progress"><span>{completed} / {run.exercises.length} exercises</span><i><b style={{width:`${run.exercises.length?completed/run.exercises.length*100:0}%`}}/></i></div>
+    <main>{[...queue.failures.entries()].filter((item): item is [string, SetWriteConflict] => item[1] instanceof SetWriteConflict).map(([id,conflict])=><section key={id} role="alert"><h3>训练组冲突 · {id.slice(0,8)}</h3><p>两份数据均已保留。请核对实际值；这不一定表示使用了另一台设备。</p><details open><summary>本机草稿 / 云端实际数据（不是计划目标）</summary><pre style={{whiteSpace:"pre-wrap",overflowWrap:"anywhere"}}>{JSON.stringify({local:conflict.local,cloud:conflict.remote},null,2)}</pre></details><button onClick={()=>void resolveConflict(id,"local")}>核对后保存本机值</button><button onClick={()=>void resolveConflict(id,"remote")}>采用云端值并备份草稿</button></section>)}<details><summary>本机冲突备份与隐私</summary><p>备份包含训练输入，明文保存在当前浏览器，不会上传。共享设备请在核对后清除；清除不会删除待保存草稿或云端历史。</p><button onClick={()=>{try {if(window.confirm(`清除当前用户的 ${conflictBackupCount(initialRun.userId)} 份本机冲突备份？不可恢复。`)){clearConflictBackups(initialRun.userId);setError("本机冲突备份已清除。");}}catch(cause){setError(messageOf(cause));}}}>清除我的本机冲突备份</button></details><div className="workout-progress"><span>{completed} / {run.exercises.length} exercises</span><i><b style={{width:`${run.exercises.length?completed/run.exercises.length*100:0}%`}}/></i></div>
       <ExerciseOrder ids={run.exercises.map(e=>e.id)} disabled={replaying||saveState!=="Saved"} onOrder={reorder} renderItem={(id,index,handle)=>{const e=run.exercises.find(item=>item.id===id)!;return <div className="workout-order-row">{handle}<span>{String(index+1).padStart(2,"0")} · {e.exerciseSnapshot.nameZh}<small>{e.exerciseSnapshot.nameEn} · {e.status==="completed"?"✓ 已完成":e.id===current?.id?"当前":"待训练"}</small></span>{run.exercises.length>1&&e.status!=="completed"&&!e.sets.some(s=>s.completed)&&<button className="workout-remove-action" disabled={saveState!=="Saved"} onClick={async()=>{try{await flush();setRemovingAction(e);}catch(cause){fail(cause);}}}>删除</button>}</div>;}}/>
       <button className="plan-replace-trigger" disabled={saveState!=="Saved"||run.exercises.length>=10} onClick={async()=>{try{await flush();setAddingAction(true);}catch(cause){fail(cause);}}}>＋ 增加动作</button>
       {run.exercises.length>7&&<p className="session-action-guidance">动作较多，请留意训练时长与恢复。</p>}
@@ -196,7 +208,5 @@ function InlineError({ text, retry }: { text: string; retry: () => void | Promis
 function findSet(run: WorkoutRunAggregate, id: string) { return run.exercises.flatMap(item => item.sets).find(item => item.id === id); }
 function mapSet(run: WorkoutRunAggregate, id: string, update: (set: WorkoutSet) => WorkoutSet): WorkoutRunAggregate { return { ...run, exercises: run.exercises.map(exercise => ({ ...exercise, sets: exercise.sets.map(set => set.id === id ? update(set) : set) })) }; }
 function localValues(patch: SetValues): Partial<WorkoutSet> { return Object.fromEntries(Object.entries(patch).map(([key, value]) => [key, value === null ? undefined : value])); }
-function toPatch(set: WorkoutSet): WorkoutSetPatch { return { measurementSnapshot:set.measurementSnapshot, actualLoad: set.actualLoad ?? null, actualReps: set.actualReps ?? null, actualDurationSeconds: set.actualDurationSeconds ?? null, actualBreaths: set.actualBreaths ?? null, actualRPE: set.actualRPE ?? null, actualRIR: set.actualRIR ?? null, completed: set.completed, note: set.note, version: set.version }; }
-function sameValues(set: WorkoutSet, patch: WorkoutSetPatch) { return JSON.stringify(set.measurementSnapshot)===JSON.stringify(patch.measurementSnapshot) && (set.actualLoad ?? null) === patch.actualLoad && (set.actualReps ?? null) === patch.actualReps && (set.actualDurationSeconds ?? null) === patch.actualDurationSeconds && (set.actualBreaths ?? null) === patch.actualBreaths && (set.actualRPE ?? null) === patch.actualRPE && (set.actualRIR ?? null) === patch.actualRIR && set.completed === patch.completed && set.note === patch.note; }
 function numberOrUndefined(value: string) { return value === "" ? undefined : Number(value); }
 function messageOf(value: unknown) { if (value instanceof Error) return value.message; if (value && typeof value === "object" && "message" in value && typeof value.message === "string") return value.message; return String(value); }
