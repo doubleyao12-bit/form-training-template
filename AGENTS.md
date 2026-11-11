@@ -10,6 +10,12 @@ Classify audit depth: FAST for local reversible UI/copy; NORMAL for domain/cross
 
 Use installed `reuse-first`/`codex-change-router` Skills when available. This preflight remains self-contained without them; do not auto-install or require a private repository. Optional detailed reference: [reviewed Reuse-First Skill](https://github.com/doubleyao12-bit/Second-Assistant/blob/bbebfdb98e9150c9183b89c90e175f15529bc80a/skills/reuse-first/SKILL.md). Preparation is not approval to publish; preserve the consent and protected boundaries below.
 
+## Preview / cloud acceptance reuse gate
+
+For any FORM preview, integration test or environment setup, first inspect the **existing** Vercel Preview topology, branch/commit, nonsecret Supabase target project ID, cloud migration state, ownership/retention of existing accounts and training records, RLS/Auth/RPC and prior acceptance evidence. A preview URL is only an application deployment; it is not proof that the backend is isolated. A PostgreSQL role/Auth stand-in is not real JWT/PostgREST acceptance.
+
+Default to a **confirmed isolated existing FORM cloud project and its authorized preview workflow** when safer/simpler than per-device local containers or a new project. Do not assume the FORM template project is empty or disposable; confirm data ownership, test identity/cleanup policy and exact permissions before mutations. No migrations, fixtures, cloud reconfiguration, paid project creation or deployment merely because discovery identified a candidate. Preserve old credentials and production links; report only environment destinations, never secrets. Stop at read-only evidence until owner approves the specific write/deploy scope.
+
 ## Actual entry and capabilities
 
 src/main.tsx loads src/CloudTrainingApp.tsx and styles.css; /oauth/consent is a separate optional entry. Do not treat legacy src/App.tsx as the official application. Four Sessions cycle by completed order through resolveNextSession in src/core-loop.ts, not a fixed weekly calendar. Search/equipment grouping is not a global equipment whitelist. The 11 unchanged migrations and 6/6 minimum real-cloud acceptance groups passed against a new isolated Supabase project: real password Auth, ordinary-user JWTs, PostgREST, persistence and key RLS paths. RLS coverage is targeted, not exhaustive. Full local Supabase-stack acceptance remains pending.
