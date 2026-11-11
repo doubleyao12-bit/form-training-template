@@ -2,6 +2,14 @@
 
 FORM is a personal training application template, not a public multi-tenant SaaS. Read [AI_START_HERE](docs/AI_START_HERE.md), [CUSTOMIZATION_MAP](docs/CUSTOMIZATION_MAP.md), [recipes](docs/CUSTOMIZATION_RECIPES.md), [quickstart](docs/QUICKSTART.md), README and rights notices before proposing changes.
 
+## Mandatory pre-development: Reuse-First
+
+Before architecture, code, new schema/migrations, dependencies, services or integrations, **audit existing reusable capabilities first**. This is required even for an overnight/autonomous Codex task. Search in order: (1) this project's current features, dependencies, fixtures and recipes, (2) available Codex Skills, installed plugins/connectors and their *actual* permissions, (3) existing database schema/RPC/RLS/Auth/Storage/migration capabilities and provider primitives, (4) relevant maintained packages and open-source references (including OpenGym for fitness-related work). Prefer configuration/what already works, then a small wrapper/adapter, then a safe compatible package; write new code only for remaining gaps.
+
+Before implementing, include a proportionate **Reuse Decision Record** in the issue or Draft PR: relevant candidates and paths/URLs/versions; direct use vs wrapper vs reference-only vs custom; functional gaps, license/AGPL compatibility and attribution, privacy/security, one-off and ongoing cost, credentials/payment requirements, tests and why the simplest correct option was chosen. A tiny bug fix may use a short record. Unknown or inaccessible is not equivalent to absent. Do not copy AGPL/copyleft source, install tools, create cloud resources, migrate real data or incur cost without a separate decision and permission. Preserve all existing consent and protected-boundary rules below.
+
+Reference canonical policy in the Second-Assistant repository: [Reuse-First Skill](https://github.com/doubleyao12-bit/Second-Assistant/blob/codex/reuse-first-workflow/skills/reuse-first/SKILL.md) and [Codex Workflow](https://github.com/doubleyao12-bit/Second-Assistant/blob/codex/reuse-first-workflow/docs/CODEX_REUSE_FIRST_WORKFLOW.md). This local rule remains effective even when the other repository is unavailable. Its cross-repository links should be updated to main after the relevant PR is merged.
+
 ## Actual entry and capabilities
 
 src/main.tsx loads src/CloudTrainingApp.tsx and styles.css; /oauth/consent is a separate optional entry. Do not treat legacy src/App.tsx as the official application. Four Sessions cycle by completed order through resolveNextSession in src/core-loop.ts, not a fixed weekly calendar. Search/equipment grouping is not a global equipment whitelist. The 11 unchanged migrations and 6/6 minimum real-cloud acceptance groups passed against a new isolated Supabase project: real password Auth, ordinary-user JWTs, PostgREST, persistence and key RLS paths. RLS coverage is targeted, not exhaustive. Full local Supabase-stack acceptance remains pending.
